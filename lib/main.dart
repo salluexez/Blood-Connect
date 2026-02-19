@@ -92,16 +92,33 @@ class Dashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Dashboard")),
-      body: Center(
-        child: ElevatedButton(
-          child: const Text("Add Blood Request"),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AddRequestScreen()),
-            );
-          },
-        ),
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Center(
+            child: ElevatedButton(
+              child: const Text("Add Blood Request"),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddRequestScreen()),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: ElevatedButton(
+              child: const Text("View Requests"),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ViewRequestsScreen()),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -175,6 +192,50 @@ class _AddRequestScreenState extends State<AddRequestScreen> {
                   ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class ViewRequestsScreen extends StatelessWidget {
+  const ViewRequestsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Blood Requests")),
+      body: StreamBuilder(
+        stream: FirebaseFirestore.instance
+            .collection("requests")
+            .orderBy("time", descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final docs = snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return const Center(child: Text("No Requests Yet"));
+          }
+
+          return ListView.builder(
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final data = docs[index];
+
+              return Card(
+                margin: const EdgeInsets.all(10),
+                child: ListTile(
+                  title: Text(data["name"]),
+                  subtitle: Text("${data["blood"]} • ${data["city"]}"),
+                  trailing: Text(data["phone"]),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
