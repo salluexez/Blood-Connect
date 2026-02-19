@@ -35,27 +35,73 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool loading = false;
 
-  Future<void> login() async {
-    setState(() => loading = true);
+//   Future<void> login() async {
+//     setState(() => loading = true);
 
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passController.text.trim(),
-      );
+//     try {
+//       await FirebaseAuth.instance.signInWithEmailAndPassword(
+//         email: emailController.text.trim(),
+//         password: passController.text.trim(),
+//       );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const Dashboard()),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Login Failed")));
+//       Navigator.pushReplacement(
+//         context,
+//         MaterialPageRoute(builder: (_) => const Dashboard()),
+//       );
+//     } catch (e) {
+//       ScaffoldMessenger.of(
+//         context,
+//       ).showSnackBar(SnackBar(content: Text("Login Failed")));
+//     }
+
+//     setState(() => loading = false);
+//   }
+Future<void> login() async {
+  setState(() => loading = true);
+
+  try {
+    // STEP 1: Firebase login
+    final userCred = await FirebaseAuth.instance
+        .signInWithEmailAndPassword(
+      email: emailController.text.trim(),
+      password: passController.text.trim(),
+    );
+
+    final uid = userCred.user!.uid;
+
+    // STEP 2: Fetch role from Firestore
+    final doc = await FirebaseFirestore.instance
+        .collection("users")
+        .doc(uid)
+        .get();
+
+    if (!doc.exists) {
+      throw Exception("User role not found");
     }
 
-    setState(() => loading = false);
+    final role = doc["role"];
+
+    // STEP 3: Navigate based on role
+    if (role == "admin") {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const AdminDashboard()),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const VolunteerDashboard()),
+      );
+    }
+
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Login Failed or Role Not Set")),
+    );
   }
+
+  setState(() => loading = false);
+}
 
   @override
   Widget build(BuildContext context) {
@@ -225,17 +271,98 @@ class ViewRequestsScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final data = docs[index];
 
-              return Card(
-                margin: const EdgeInsets.all(10),
-                child: ListTile(
-                  title: Text(data["name"]),
-                  subtitle: Text("${data["blood"]} • ${data["city"]}"),
-                  trailing: Text(data["phone"]),
+              return Dismissible(
+                key: Key(data.id),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  color: Colors.red,
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  child: const Icon(Icons.delete, color: Colors.white),
+                ),
+                onDismissed: (direction) {
+                  FirebaseFirestore.instance
+                      .collection("requests")
+                      .doc(data.id)
+                      .delete();
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Request Deleted")),
+                  );
+                },
+                child: Card(
+                  margin: const EdgeInsets.all(10),
+                  child: ListTile(
+                    title: Text(data["name"]),
+                    subtitle: Text("${data["blood"]} • ${data["city"]}"),
+                    trailing: Text(data["phone"]),
+                  ),
                 ),
               );
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class AdminDashboard extends StatelessWidget {
+  const AdminDashboard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Admin Dashboard")),
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Center(
+            child: ElevatedButton(
+              child: const Text("Add Blood Request"),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddRequestScreen()),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: ElevatedButton(
+              child: const Text("View Requests"),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ViewRequestsScreen()),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class VolunteerDashboard extends StatelessWidget {
+  const VolunteerDashboard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Volunteer Dashboard")),
+      body: Center(
+        child: ElevatedButton(
+          child: const Text("View Requests"),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ViewRequestsScreen()),
+            );
+          },
+        ),
       ),
     );
   }
